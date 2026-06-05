@@ -4,14 +4,16 @@ import time
 
 from config import *
 
-
+#First Screener
 def fetch_candidates(sector):
     query = EquityQuery(
         "and",
         [
+            #Screens Based On Sector From Config
             EquityQuery("eq", ["region", "us"]),
             EquityQuery("eq", ["sector", sector]),
             EquityQuery(
+                #Filters Stocks Between Our Hard Min & Max MC Filters (in config)
                 "btwn",
                 [
                     "intradaymarketcap",
@@ -21,6 +23,7 @@ def fetch_candidates(sector):
             ),
             EquityQuery(
                 "gt",
+                #Filters Stocks Greater Than Preset Volume (in config)
                 [
                     "avgdailyvol3m",
                     MIN_AVG_VOLUME,
@@ -29,9 +32,12 @@ def fetch_candidates(sector):
         ],
     )
 
+    #Puts First Filtered Stocks Into Tickers
+    #Offset Tells Yahoo Finance to Start At Beginning Of The List
     tickers = []
     offset = 0
 
+    #Loop Runs Till We Tell It To Break
     while True:
         result = yf.screen(
             query=query,
@@ -39,18 +45,20 @@ def fetch_candidates(sector):
             size=FETCH_BATCH_SIZE,
         )
 
+        #Quotes Gets the Symbol
         quotes = result["quotes"]
 
+        #Break When No More Stocks
         if not quotes:
             break
 
         tickers.extend(q["symbol"] for q in quotes)
-
+        #Gets 250 Stocks Then the Next 250 (prevents from errors)
         offset += FETCH_BATCH_SIZE
 
     return sorted(set(tickers))
 
-
+#Gets Our Specific Requirements
 def get_metrics(symbol):
     try:
         info = yf.Ticker(symbol).info
@@ -74,74 +82,68 @@ def get_metrics(symbol):
         print(f"Error loading {symbol}: {e}")
         return None
 
-
+#Checks For Hard Filters
 def passes_hard_filters(metrics):
     if metrics is None:
         return False
 
-    revenue = metrics["revenue"]
-
-    if revenue is None:
+    #Revenue
+    revenue = metrics.get("revenue")
+    if revenue is None or revenue < MIN_REVENUE:
         return False
 
-    if revenue < MIN_REVENUE:
-        return False
+    sector = metrics.get("sector")
 
-    sector = metrics["sector"]
-
+    # only enforce debt filter outside financials
     if sector != "Financial Services":
-        de = metrics["debt_to_equity"]
-
-        if de is None:
-            return False
-
-        if de > MAX_DEBT_TO_EQUITY:
+        de = metrics.get("debt_to_equity")
+        if de is None or de > MAX_DEBT_TO_EQUITY:
             return False
 
     return True
 
 
 def score_stock(metrics):
-    score = 0
+    breakdown = {}
 
-    if metrics["roe"] is not None and metrics["roe"] > MIN_ROE:
-        score += 1
+    breakdown["roe"] = (
+        metrics["roe"] is not None and metrics["roe"] > MIN_ROE
+    )
 
-    if metrics["roa"] is not None and metrics["roa"] > MIN_ROA:
-        score += 1
+    breakdown["roa"] = (
+        metrics["roa"] is not None and metrics["roa"] > MIN_ROA
+    )
 
-    if (
+    breakdown["margin"] = (
         metrics["gross_margin"] is not None
         and metrics["gross_margin"] > MIN_GROSS_MARGIN
-    ):
-        score += 1
+    )
 
-    if (
+    breakdown["growth"] = (
         metrics["revenue_growth"] is not None
         and metrics["revenue_growth"] > 0
-    ):
-        score += 1
+    )
 
-    if (
+    breakdown["fcf"] = (
         metrics["free_cf"] is not None
         and metrics["free_cf"] > 0
-    ):
-        score += 1
+    )
 
-    if (
+    breakdown["peg"] = (
         metrics["peg"] is not None
         and metrics["peg"] < MAX_PEG
-    ):
-        score += 1
+    )
 
-    return score
+    score = sum(breakdown.values())
 
+    return score, breakdown
 
+#Prints Stocks
 def main():
     results = []
 
     for sector in SECTORS:
-        print(f"Scanning {sector}...")
+        print(f"\nScanning {sector}...")
 
         tickers = fetch_candidates(sector)
 
@@ -149,34 +151,50 @@ def main():
 
         for ticker in tickers:
             time.sleep(0.5)
-            metrics = get_metrics(ticker)
 
+            metrics = get_metrics(ticker)
             if not passes_hard_filters(metrics):
                 continue
 
-            score = score_stock(metrics)
+            score, breakdown = score_stock(metrics)
 
-            results.append(
-                {
-                    "symbol": ticker,
-                    "sector": sector,
-                    "score": score,
-                    "roe": metrics["roe"],
-                    "revenue": metrics["revenue"],
-                }
-            )
+            results.append({
+                "symbol": ticker,
+                "sector": sector,
+                "score": score,
+                "breakdown": breakdown,
+                "roe": metrics["roe"],
+                "revenue": metrics["revenue"],
+            })
 
     results.sort(key=lambda x: x["score"], reverse=True)
 
-    print("\nTOP 25 STOCKS\n")
+    from collections import defaultdict
 
-    for stock in results[:25]:
-        print(
-            f"{stock['symbol']:6} | "
-            f"{stock['sector'][:20]:20} | "
-            f"Score: {stock['score']}"
-        )
+    sector_stocks = defaultdict(list)
 
+    # Group stocks by sector
+    for stock in results:
+        sector_stocks[stock["sector"]].append(stock)
+
+    print("\nTOP 5 STOCKS BY SECTOR\n")
+
+    for sector in SECTORS:
+        print(f"\n=== {sector} ===")
+
+        for stock in sector_stocks[sector][:5]:
+            b = stock["breakdown"]
+
+            print(
+                f"{stock['symbol']:6} | "
+                f"Score: {stock['score']} | "
+                f"ROE:{int(b['roe'])} "
+                f"ROA:{int(b['roa'])} "
+                f"M:{int(b['margin'])} "
+                f"G:{int(b['growth'])} "
+                f"FCF:{int(b['fcf'])} "
+                f"PEG:{int(b['peg'])}"
+            )
 
 if __name__ == "__main__":
     main()

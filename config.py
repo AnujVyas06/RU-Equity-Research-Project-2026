@@ -28,13 +28,12 @@ MAX_PEG = 2.0
 FETCH_BATCH_SIZE = 250
 
 SECTORS = [
-    "Technology",
+    #"Technology",
     "Healthcare",
     "Industrials",
-    "Consumer Cyclical",
-    "Consumer Defensive",
-    "Communication Services",
-    "Energy",
-    "Basic Materials",
-    "Financial Services",
+    #"Energy",
+    #"Consumer Cyclical",
+    #"Consumer Defensive",
+    #"Basic Materials",
+    #"Financial Services",
 ]

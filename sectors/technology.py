@@ -1,5 +1,12 @@
 # sectors/technology.py
 from utils import revenue_acceleration_score
+from utils import earnings_beat_score
+from config import HIGH_EPS_GROWTH, MEDIUM_EPS_GROWTH, HIGH_ROIC, MEDIUM_ROIC
+from config import (
+    HIGH_ROIC, MEDIUM_ROIC, 
+    MAX_PEG_EXCELLENT, MAX_PEG_ACCEPTABLE, 
+    SECTOR_EV_SALES_MEDIANS
+)
 
 def score(metrics):
 
@@ -69,25 +76,31 @@ def score(metrics):
     # EPS Growth (10)
     # -------------------------
 
-    eps = metrics.get("eps_growth")
+    eps_growth = metrics.get("eps_growth")
 
-    if eps is not None:
-
-        if eps > 0.30:
+    if eps_growth is not None:
+        if eps_growth > HIGH_EPS_GROWTH:        # 0.30 from config
             pts = 10
-        elif eps > 0.15:
+        elif eps_growth > MEDIUM_EPS_GROWTH:    # 0.15 from config
             pts = 7
-        elif eps > 0:
+        elif eps_growth > 0:
             pts = 3
         else:
             pts = 0
-
     else:
         pts = 0
 
     score += pts
     breakdown["EPS Growth"] = pts
 
+    # -------------------------
+    # Earnings Beat History (5)
+    # -------------------------
+
+    beat_pts = earnings_beat_score(metrics.get("earnings_history"))
+
+    score += beat_pts
+    breakdown["Earnings Beat History"] = beat_pts
 
     # -------------------------
     # Operating Cash Flow (5)
@@ -113,49 +126,69 @@ def score(metrics):
     score += pts
     breakdown["Free Cash Flow"] = pts
 
+    # -------------------------
+    # Relative Performance (10)
+    # -------------------------
+    # Grabs the score already calculated in get_metrics
+    relative_pts = metrics.get("relative_score", 0) 
+    score += relative_pts
+    breakdown["Relative Performance"] = relative_pts
 
     # -------------------------
-    # ROIC (5)
+    # Technical Trend (5)
     # -------------------------
+    # Grabs the score already calculated in get_metrics
+    trend_pts = metrics.get("trend_score", 0)
+    score += trend_pts
+    breakdown["Technical Trend"] = trend_pts
 
-    roic = metrics.get("roic")
-
+# ---------------------------------------------------------
+    # Capital Efficiency (ROIC Score) (5)
+    # ---------------------------------------------------------
+    roic = metrics.get("roic") 
+    roic_pts = 0
     if roic is not None:
+        if roic > HIGH_ROIC:
+            roic_pts = 5
+        elif roic >= MEDIUM_ROIC:
+            roic_pts = 3
 
-        if roic > 0.15:
-            pts = 5
-        elif roic > 0.10:
-            pts = 3
-        else:
-            pts = 0
-
-    else:
-        pts = 0
-
-    score += pts
-    breakdown["ROIC"] = pts
+    score += roic_pts
+    breakdown["Capital Efficiency"] = roic_pts
 
 
-    # -------------------------
-    # PEG (2)
-    # -------------------------
+    # ---------------------------------------------------------
+    # EV/Sales vs Sector Median (3)
+    # ---------------------------------------------------------
+    ev_sales = metrics.get("ev_to_sales") 
+    sector_name = metrics.get("sector", "Technology")
+    sector_median = SECTOR_EV_SALES_MEDIANS.get(sector_name, 4.0)
+    ev_sales_pts = 0
 
-    peg = metrics.get("peg")
+    if ev_sales is not None:
+        if ev_sales < sector_median:
+            ev_sales_pts = 3
+        elif abs(ev_sales - sector_median) / sector_median <= 0.15:
+            ev_sales_pts = 2
 
+    score += ev_sales_pts
+    breakdown["EV/Sales Valuation"] = ev_sales_pts
+
+
+    # ---------------------------------------------------------
+    # PEG Ratio Score (2)
+    # ---------------------------------------------------------
+    peg = metrics.get("peg") 
+    peg_pts = 0
     if peg is not None:
+        if peg < MAX_PEG_EXCELLENT:
+            peg_pts = 2
+        elif peg <= MAX_PEG_ACCEPTABLE:
+            peg_pts = 1
 
-        if peg < 1:
-            pts = 2
-        elif peg < 1.5:
-            pts = 1
-        else:
-            pts = 0
-
-    else:
-        pts = 0
-
-    score += pts
-    breakdown["PEG"] = pts
+    score += peg_pts
+    breakdown["PEG Ratio"] = peg_pts
 
 
+    # --- FINAL RETURN ---
     return score, breakdown

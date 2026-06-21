@@ -140,3 +140,27 @@ SECTORS = [
     #"Basic Materials",
 
 ]
+
+# =====================================================
+# NEW MATRIX SCORING TARGETS
+# =====================================================
+
+# Capital Efficiency (ROIC Limits)
+HIGH_ROIC = 0.15
+MEDIUM_ROIC = 0.10
+
+# PEG Ratio Targets
+MAX_PEG_EXCELLENT = 1.0
+MAX_PEG_ACCEPTABLE = 1.5
+
+# EV/Sales Sector Medians (Baseline Estimates)
+# If a stock's EV/Sales is lower than this number, it beats the median.
+SECTOR_EV_SALES_MEDIANS = {
+    "Technology": 4.2,
+    "Healthcare": 3.5,
+    "Consumer Cyclical": 2.1,
+    "Consumer Defensive": 1.5,
+    "Industrials": 2.0,
+    "Energy": 1.8,
+    "Basic Materials": 1.6
+}

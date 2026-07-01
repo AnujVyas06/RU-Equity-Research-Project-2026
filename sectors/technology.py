@@ -1,8 +1,8 @@
 # sectors/technology.py
 from utils import revenue_acceleration_score
 from utils import earnings_beat_score
-from config import HIGH_EPS_GROWTH, MEDIUM_EPS_GROWTH, HIGH_ROIC, MEDIUM_ROIC
 from config import (
+    HIGH_EPS_GROWTH, MEDIUM_EPS_GROWTH, 
     HIGH_ROIC, MEDIUM_ROIC, 
     MAX_PEG_EXCELLENT, MAX_PEG_ACCEPTABLE, 
     SECTOR_EV_SALES_MEDIANS
@@ -14,22 +14,18 @@ def score(metrics):
     breakdown = {}
 
     # -------------------------
-    # Revenue Growth (15)
+    # Revenue Growth (Max 20) - Scaled up for 100-pt system
     # -------------------------
-
     growth = metrics.get("revenue_growth")
-
     if growth is not None:
-
         if growth > 0.40:
-            pts = 15
+            pts = 20
         elif growth > 0.25:
-            pts = 12
+            pts = 15
         elif growth > 0.15:
-            pts = 8
+            pts = 10
         else:
             pts = 0
-
     else:
         pts = 0
 
@@ -38,24 +34,19 @@ def score(metrics):
 
 
     # -------------------------
-    # Revenue Acceleration (15)
+    # Revenue Acceleration (Max 15)
     # -------------------------
-
     quarterly_revenue = metrics.get("quarterly_revenue")
-
     pts = revenue_acceleration_score(quarterly_revenue)
-
     score += pts
     breakdown["Revenue Acceleration"] = pts
 
-    # -------------------------
-    # Gross Margin (10)
-    # -------------------------
 
+    # -------------------------
+    # Gross Margin (Max 10)
+    # -------------------------
     margin = metrics.get("gross_margin")
-
     if margin is not None:
-
         if margin > 0.50:
             pts = 10
         elif margin > 0.35:
@@ -64,7 +55,6 @@ def score(metrics):
             pts = 4
         else:
             pts = 0
-
     else:
         pts = 0
 
@@ -73,18 +63,16 @@ def score(metrics):
 
 
     # -------------------------
-    # EPS Growth (10)
+    # EPS Growth (Max 15) - Scaled up for 100-pt system
     # -------------------------
-
     eps_growth = metrics.get("eps_growth")
-
     if eps_growth is not None:
         if eps_growth > HIGH_EPS_GROWTH:        # 0.30 from config
-            pts = 10
+            pts = 15
         elif eps_growth > MEDIUM_EPS_GROWTH:    # 0.15 from config
-            pts = 7
+            pts = 10
         elif eps_growth > 0:
-            pts = 3
+            pts = 5
         else:
             pts = 0
     else:
@@ -93,17 +81,17 @@ def score(metrics):
     score += pts
     breakdown["EPS Growth"] = pts
 
-    # -------------------------
-    # Earnings Beat History (5)
-    # -------------------------
 
+    # -------------------------
+    # Earnings Beat History (Max 5)
+    # -------------------------
     beat_pts = earnings_beat_score(metrics.get("earnings_history"))
-
     score += beat_pts
     breakdown["Earnings Beat History"] = beat_pts
 
+
     # -------------------------
-    # Operating Cash Flow (5)
+    # Operating Cash Flow (Max 5)
     # -------------------------
     if (metrics.get("operating_cf") or 0) > 0:
         pts = 5
@@ -115,9 +103,8 @@ def score(metrics):
 
 
     # -------------------------
-    # Free Cash Flow (5)
+    # Free Cash Flow (Max 5)
     # -------------------------
-
     if (metrics.get("free_cf") or 0) > 0:
         pts = 5
     else:
@@ -126,24 +113,25 @@ def score(metrics):
     score += pts
     breakdown["Free Cash Flow"] = pts
 
+
     # -------------------------
-    # Relative Performance (10)
+    # Relative Performance (Max 10)
     # -------------------------
-    # Grabs the score already calculated in get_metrics
     relative_pts = metrics.get("relative_score", 0) 
     score += relative_pts
     breakdown["Relative Performance"] = relative_pts
 
+
     # -------------------------
-    # Technical Trend (5)
+    # Technical Trend (Max 5)
     # -------------------------
-    # Grabs the score already calculated in get_metrics
     trend_pts = metrics.get("trend_score", 0)
     score += trend_pts
     breakdown["Technical Trend"] = trend_pts
 
-# ---------------------------------------------------------
-    # Capital Efficiency (ROIC Score) (5)
+
+    # ---------------------------------------------------------
+    # Capital Efficiency (ROIC Score) (Max 5)
     # ---------------------------------------------------------
     roic = metrics.get("roic") 
     roic_pts = 0
@@ -158,7 +146,7 @@ def score(metrics):
 
 
     # ---------------------------------------------------------
-    # EV/Sales vs Sector Median (3)
+    # EV/Sales vs Sector Median (Max 3)
     # ---------------------------------------------------------
     ev_sales = metrics.get("ev_to_sales") 
     sector_name = metrics.get("sector", "Technology")
@@ -176,7 +164,7 @@ def score(metrics):
 
 
     # ---------------------------------------------------------
-    # PEG Ratio Score (2)
+    # PEG Ratio Score (Max 2)
     # ---------------------------------------------------------
     peg = metrics.get("peg") 
     peg_pts = 0
@@ -189,6 +177,4 @@ def score(metrics):
     score += peg_pts
     breakdown["PEG Ratio"] = peg_pts
 
-
-    # --- FINAL RETURN ---
     return score, breakdown

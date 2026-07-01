@@ -23,6 +23,52 @@ SECTOR_BENCHMARKS = {
     "Consumer Defensive": "XLP",
 }
 
+def calculate_interest_coverage(ticker):
+    """
+    Calculates the Interest Coverage Ratio (EBIT / Interest Expense).
+    Returns float, or None if data is missing or interest expense is 0/positive.
+    """
+    try:
+        # Use annual income statement for more stable structural debt safety analysis
+        income = ticker.income_stmt
+        if income is None or income.empty:
+            return None
+
+        # yfinance labels can vary slightly; check standard variations
+        ebit_labels = ["EBIT", "Operating Income"]
+        interest_labels = ["Interest Expense", "Interest Expense Non Operating"]
+
+        ebit = None
+        interest_exp = None
+
+        # Extract the most recent fiscal year value (first column)
+        for label in ebit_labels:
+            if label in income.index:
+                ebit = income.loc[label].dropna().iloc[0]
+                break
+
+        for label in interest_labels:
+            if label in income.index:
+                interest_exp = income.loc[label].dropna().iloc[0]
+                break
+
+        if ebit is None or interest_exp is None:
+            return None
+
+        # Interest expense is often represented as a positive number in yfinance.
+        # Ensure it's absolute to avoid sign confusion.
+        interest_exp = abs(interest_exp)
+
+        if interest_exp == 0:
+            return float('inf')  # No interest expense means functionally infinite coverage
+
+        return ebit / interest_exp
+
+    except Exception as e:
+        # De-comment for debugging issues with specific tickers
+        # print(f"Interest Coverage Error for {ticker.ticker}: {e}")
+        return None
+        
 def get_moving_average_trend_score(ticker):
     try:
         # FIX: Changed period from "3m" to "3mo"
@@ -113,6 +159,11 @@ def get_earnings_history_yf(ticker):
             return []
 
         df = df.reset_index()
+        # Ensure the dataframe is strictly ordered from newest date to oldest date
+        if "Earnings Date" in df.columns:
+            df = df.sort_values(by="Earnings Date", ascending=False)
+        elif "index" in df.columns: # fallback if index name didn't change
+            df = df.sort_values(by="index", ascending=False)
 
         history = []
         for _, row in df.iterrows():
@@ -305,3 +356,5 @@ def revenue_acceleration_score(quarterly_revenue):
 
     else:
         return 0    # Declining
+    
+    

@@ -15,7 +15,7 @@ import sys
 import os
 import contextlib
 
-from utils import calculate_relative_performance_score, get_moving_average_trend_score
+from utils import calculate_relative_performance_score, get_moving_average_trend_score, calculate_interest_coverage
 from config import (
     HIGH_ROIC, MEDIUM_ROIC, 
     MAX_PEG_EXCELLENT, MAX_PEG_ACCEPTABLE, 
@@ -123,8 +123,8 @@ def get_metrics(symbol):
         trend_pts = get_moving_average_trend_score(ticker)
         relative_pts = calculate_relative_performance_score(ticker, sector_name)
 
-        # ✅ FIX: Explicitly extract and define roic_val here before the return dictionary looks for it
         roic_val = info.get("returnOnInvestment") or info.get("returnOnAssets")
+        interest_coverage_val = calculate_interest_coverage(ticker)
 
         return {
             "symbol": symbol,
@@ -148,6 +148,7 @@ def get_metrics(symbol):
             "relative_score": relative_pts,
             "roic": roic_val,
             "ev_to_sales": info.get("enterpriseToRevenue"),
+            "interest_coverage": interest_coverage_val
         }
 
     except Exception as e:
@@ -193,6 +194,12 @@ def passes_hard_filters(m):
                 de_ratio = de_ratio * 100
                 
             if de_ratio > limit:
+                return False
+            
+        ic_ratio = m.get("interest_coverage")
+        if ic_ratio is not None:
+            # If they fail to meet the minimum required benchmark floor
+            if ic_ratio < MIN_INTEREST_COVERAGE:
                 return False
 
     return True
@@ -262,7 +269,8 @@ def main():
                 "trend_score": metrics["trend_score"],
                 "roic": metrics["roic"],
                 "ev_to_sales": metrics["ev_to_sales"],
-                "peg": metrics["peg"]
+                "peg": metrics["peg"],
+                "interest_coverage": metrics.get("interst_coverage")
             })
 
         # IMPORTANT: sort per sector
@@ -299,13 +307,22 @@ def main():
             evs_str = f"{s['ev_to_sales']:.2f}x" if s['ev_to_sales'] is not None else "N/A"
             peg_str = f"{s['peg']:.2f}" if s['peg'] is not None else "N/A"
 
+            ic = s.get("interest_coverage")
+            if ic is not None:
+                if ic == float('inf'):
+                    ic_str = "Inf (No Debt)"
+                else:
+                    ic_str = f"{ic:.2f}x"
+            else:
+                ic_str = "N/A"
+
             # --- VISUAL PRINTING LAYOUT ---
             print(f"--------------------------------------------------------------------------------")
             print(f"🚀 {s['symbol']:<6} | ✨ Score: {s['score']}/100 | 🏷️  {s['category']}")
             print(f"--------------------------------------------------------------------------------")
             
             # Expanded Indented Metrics Blocks for clean dashboard presentation
-            print(f"   [Financials] Cap: {mc_str:<9} | Rev: {rev_str:<10} | Vol ($): {dv_str}")
+            print(f"   [Financials] Cap: {mc_str:<9} | Rev: {rev_str:<10} | Vol ($): {dv_str} | IntCov: {ic_str}")
             print(f"   [Margins]    Gross: {gm_str:<7} | D/E: {de_str:<10} | ROIC: {roic_str}")
             print(f"   [Growth]     Rev Growth: {rev_g_str:<6} | EPS Growth: {epsg_str:<9} | PEG: {peg_str}")
             print(f"   [Valuation]  EV/Sales: {evs_str}")
